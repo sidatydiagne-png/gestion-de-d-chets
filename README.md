@@ -1,1 +1,1 @@
-# gestion-de-d-chets
+# gestion-de-dechets
