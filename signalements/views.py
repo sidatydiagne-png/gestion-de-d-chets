@@ -1,7 +1,7 @@
 from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly, AllowAny
 from rest_framework.response import Response
 from .models import Signalement, PhotoSupplementaire
 from .serializers import (
@@ -29,10 +29,17 @@ class SignalementViewSet(viewsets.ModelViewSet):
     """
     queryset = Signalement.objects.select_related('signale_par', 'quartier__commune').all()
     serializer_class = SignalementSerializer
-    permission_classes = [IsAuthenticated]
     filterset_fields = ['statut', 'type_dechet', 'niveau_urgence', 'quartier', 'quartier__commune']
     search_fields = ['description', 'adresse_description', 'quartier__nom']
     ordering_fields = ['created_at', 'niveau_urgence', 'statut']
+
+    def get_permissions(self):
+        # Les citoyens peuvent consulter et créer des signalements, et voir la carte,
+        # sans être connectés. Traiter/modifier/supprimer/statistiques restent réservés
+        # aux utilisateurs authentifiés (admin/agents).
+        if self.action in ['list', 'retrieve', 'create', 'carte']:
+            return [AllowAny()]
+        return [IsAuthenticated()]
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
