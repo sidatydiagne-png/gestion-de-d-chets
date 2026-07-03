@@ -1,0 +1,203 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Collectes — Déchets Urbains{% endblock %}
+
+{% block content %}
+<h3 class="mb-4">Tournées de collecte & véhicules</h3>
+<div id="alert-box"></div>
+
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card card-stat">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="mb-0">Véhicules</h6>
+          <button class="btn btn-sm btn-dechets" data-bs-toggle="modal" data-bs-target="#vehiculeModal">
+            <i class="bi bi-plus-circle"></i> Ajouter
+          </button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead><tr><th>Immat.</th><th>Type</th><th>Capacité</th><th>Dispo</th></tr></thead>
+            <tbody id="veh-tbody"><tr><td colspan="4" class="text-muted">Chargement...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card card-stat">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="mb-0">Tournées</h6>
+          <button class="btn btn-sm btn-dechets" data-bs-toggle="modal" data-bs-target="#tourneeModal">
+            <i class="bi bi-plus-circle"></i> Planifier
+          </button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead><tr><th>Titre</th><th>Date</th><th>Véhicule</th><th>Statut</th><th>Signal.</th><th>Actions</th></tr></thead>
+            <tbody id="tournees-tbody"><tr><td colspan="6" class="text-muted">Chargement...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Véhicule -->
+<div class="modal fade" id="vehiculeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Nouveau véhicule</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2"><label class="form-label">Immatriculation</label><input class="form-control" id="v-immat" required></div>
+        <div class="mb-2">
+          <label class="form-label">Type</label>
+          <select class="form-select" id="v-type">
+            <option value="camion">Camion benne</option>
+            <option value="tracteur">Tracteur-remorque</option>
+            <option value="moto">Moto-tricycle (petites rues)</option>
+          </select>
+        </div>
+        <div class="mb-2"><label class="form-label">Capacité (tonnes)</label><input type="number" step="any" class="form-control" id="v-capacite" required></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button class="btn btn-dechets" onclick="createVehicule()">Créer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Tournée -->
+<div class="modal fade" id="tourneeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Planifier une tournée</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2"><label class="form-label">Titre</label><input class="form-control" id="t-titre" required></div>
+        <div class="mb-2"><label class="form-label">Date prévue</label><input type="date" class="form-control" id="t-date" required></div>
+        <div class="mb-2"><label class="form-label">Véhicule</label><select class="form-select" id="t-vehicule"></select></div>
+        <div class="mb-2">
+          <label class="form-label">Signalements à inclure (nouveaux)</label>
+          <select class="form-select" id="t-signalements" multiple size="5"></select>
+          <small class="text-muted">Ctrl/Cmd + clic pour sélectionner plusieurs</small>
+        </div>
+        <div class="mb-2"><label class="form-label">Notes</label><textarea class="form-control" id="t-notes" rows="2"></textarea></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button class="btn btn-dechets" onclick="createTournee()">Planifier</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const STATUT_TOURNEE_LABELS = { planifiee: 'Planifiée', en_cours: 'En cours', terminee: 'Terminée', annulee: 'Annulée' };
+
+async function loadVehicules() {
+  const vehicules = await apiFetchAll('/vehicules/');
+  const tbody = document.getElementById('veh-tbody');
+  tbody.innerHTML = vehicules.length ? vehicules.map(v => `
+    <tr>
+      <td>${v.immatriculation}</td><td>${v.type_vehicule}</td><td>${v.capacite_tonnes} t</td>
+      <td>${v.disponible ? '<span class="badge bg-success">Oui</span>' : '<span class="badge bg-secondary">Non</span>'}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="4" class="text-muted">Aucun véhicule.</td></tr>';
+
+  const sel = document.getElementById('t-vehicule');
+  sel.innerHTML = '<option value="">— Aucun —</option>' +
+    vehicules.filter(v => v.disponible).map(v => `<option value="${v.id}">${v.immatriculation} (${v.type_vehicule})</option>`).join('');
+}
+
+async function loadSignalementsForTournee() {
+  const res = await apiFetch('/signalements/?statut=nouveau');
+  if (!res.ok) return;
+  const data = await res.json();
+  const items = data.results || data;
+  const sel = document.getElementById('t-signalements');
+  sel.innerHTML = items.map(s => `<option value="${s.id}">#${s.id} — ${s.quartier_nom} — ${s.type_dechet_display}</option>`).join('');
+}
+
+async function loadTournees() {
+  const tournees = await apiFetchAll('/tournees/');
+  const tbody = document.getElementById('tournees-tbody');
+  tbody.innerHTML = tournees.length ? tournees.map(t => `
+    <tr>
+      <td>${t.titre}</td>
+      <td>${t.date_prevue}</td>
+      <td>${t.vehicule_detail ? t.vehicule_detail.immatriculation : '—'}</td>
+      <td><span class="badge bg-secondary">${STATUT_TOURNEE_LABELS[t.statut] || t.statut}</span></td>
+      <td>${t.nb_signalements}</td>
+      <td>
+        ${t.statut === 'planifiee' ? `<button class="btn btn-sm btn-outline-primary" onclick="demarrerTournee(${t.id})"><i class="bi bi-play-fill"></i> Démarrer</button>` : ''}
+        ${t.statut === 'en_cours' ? `<button class="btn btn-sm btn-outline-success" onclick="terminerTournee(${t.id})"><i class="bi bi-check2"></i> Terminer</button>` : ''}
+      </td>
+    </tr>
+  `).join('') : '<tr><td colspan="6" class="text-muted">Aucune tournée.</td></tr>';
+}
+
+async function createVehicule() {
+  const body = {
+    immatriculation: document.getElementById('v-immat').value,
+    type_vehicule: document.getElementById('v-type').value,
+    capacite_tonnes: document.getElementById('v-capacite').value,
+    disponible: true,
+  };
+  const res = await apiFetch('/vehicules/', { method: 'POST', body: JSON.stringify(body) });
+  if (res.ok) {
+    bootstrap.Modal.getInstance(document.getElementById('vehiculeModal')).hide();
+    showAlert('alert-box', 'Véhicule ajouté.', 'success');
+    loadVehicules();
+  } else {
+    showAlert('alert-box', "Erreur lors de l'ajout du véhicule.");
+  }
+}
+
+async function createTournee() {
+  const signalements = Array.from(document.getElementById('t-signalements').selectedOptions).map(o => parseInt(o.value));
+  const body = {
+    titre: document.getElementById('t-titre').value,
+    date_prevue: document.getElementById('t-date').value,
+    vehicule: document.getElementById('t-vehicule').value || null,
+    signalements,
+    notes: document.getElementById('t-notes').value,
+  };
+  const res = await apiFetch('/tournees/', { method: 'POST', body: JSON.stringify(body) });
+  if (res.ok) {
+    bootstrap.Modal.getInstance(document.getElementById('tourneeModal')).hide();
+    showAlert('alert-box', 'Tournée planifiée.', 'success');
+    loadTournees();
+    loadSignalementsForTournee();
+  } else {
+    showAlert('alert-box', 'Erreur lors de la planification de la tournée.');
+  }
+}
+
+async function demarrerTournee(id) {
+  const res = await apiFetch(`/tournees/${id}/demarrer/`, { method: 'POST' });
+  if (res.ok) { showAlert('alert-box', 'Tournée démarrée.', 'success'); loadTournees(); }
+  else showAlert('alert-box', 'Impossible de démarrer cette tournée.');
+}
+
+async function terminerTournee(id) {
+  const res = await apiFetch(`/tournees/${id}/terminer/`, { method: 'POST' });
+  if (res.ok) { showAlert('alert-box', 'Tournée terminée, signalements résolus.', 'success'); loadTournees(); loadVehicules(); }
+  else showAlert('alert-box', 'Impossible de terminer cette tournée.');
+}
+
+loadVehicules();
+loadTournees();
+loadSignalementsForTournee();
+</script>
+{% endblock %}

@@ -1,0 +1,173 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Tableau de bord — Déchets Urbains{% endblock %}
+
+{% block content %}
+<h3 class="mb-4">Tableau de bord décisionnel</h3>
+<div id="alert-box"></div>
+
+<div class="row g-3 mb-4" id="stat-cards">
+  <div class="col-6 col-md-3">
+    <div class="card card-stat">
+      <div class="card-body">
+        <div class="text-muted small">Total signalements</div>
+        <div class="stat-value text-dark" id="stat-total">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card card-stat">
+      <div class="card-body">
+        <div class="text-muted small">Nouveaux</div>
+        <div class="stat-value" style="color:#1976d2" id="stat-nouveaux">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card card-stat">
+      <div class="card-body">
+        <div class="text-muted small">En cours</div>
+        <div class="stat-value" style="color:#f9a825" id="stat-encours">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card card-stat">
+      <div class="card-body">
+        <div class="text-muted small">Résolus</div>
+        <div class="stat-value" style="color:#2e7d32" id="stat-resolus">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-md-4">
+    <div class="card card-stat h-100">
+      <div class="card-body">
+        <h6 class="card-title">Par type de déchet</h6>
+        <canvas id="chart-type"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card card-stat h-100">
+      <div class="card-body">
+        <h6 class="card-title">Par niveau d'urgence</h6>
+        <canvas id="chart-urgence"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card card-stat h-100">
+      <div class="card-body">
+        <h6 class="card-title">Par commune</h6>
+        <canvas id="chart-commune"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mt-1">
+  <div class="col-12">
+    <div class="card card-stat">
+      <div class="card-body">
+        <h6 class="card-title mb-3"><i class="bi bi-exclamation-triangle-fill text-danger"></i> Signalements urgents / critiques non traités</h6>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th>#</th><th>Quartier</th><th>Type</th><th>Urgence</th><th>Statut</th><th>Créé le</th>
+              </tr>
+            </thead>
+            <tbody id="urgents-tbody">
+              <tr><td colspan="6" class="text-muted">Chargement...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const URGENCE_LABELS = { faible: 'Faible', moyen: 'Moyen', urgent: 'Urgent', critique: 'Critique' };
+const STATUT_LABELS = { nouveau: 'Nouveau', en_cours: 'En cours', resolu: 'Résolu', rejete: 'Rejeté' };
+
+async function loadDashboard() {
+  const res = await apiFetch('/signalements/statistiques/');
+  if (!res.ok) {
+    showAlert('alert-box', "Impossible de charger les statistiques.");
+    return;
+  }
+  const data = await res.json();
+
+  document.getElementById('stat-total').textContent = data.total_signalements;
+  document.getElementById('stat-nouveaux').textContent = data.nouveaux;
+  document.getElementById('stat-encours').textContent = data.en_cours;
+  document.getElementById('stat-resolus').textContent = data.resolus;
+
+  const typeLabels = Object.keys(data.par_type);
+  const typeValues = Object.values(data.par_type);
+  new Chart(document.getElementById('chart-type'), {
+    type: 'doughnut',
+    data: {
+      labels: typeLabels,
+      datasets: [{ data: typeValues, backgroundColor: ['#2e7d32','#66bb6a','#f9a825','#ef6c00','#c62828','#607d8b'] }]
+    },
+    options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } } }
+  });
+
+  const urgenceLabels = Object.keys(data.par_urgence).map(k => URGENCE_LABELS[k] || k);
+  const urgenceValues = Object.values(data.par_urgence);
+  new Chart(document.getElementById('chart-urgence'), {
+    type: 'bar',
+    data: {
+      labels: urgenceLabels,
+      datasets: [{ data: urgenceValues, backgroundColor: ['#90caf9','#f9a825','#ef6c00','#c62828'] }]
+    },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+
+  const communeLabels = data.par_commune.map(c => c.quartier__commune__nom || 'N/A');
+  const communeValues = data.par_commune.map(c => c.total);
+  new Chart(document.getElementById('chart-commune'), {
+    type: 'bar',
+    data: {
+      labels: communeLabels,
+      datasets: [{ data: communeValues, backgroundColor: '#1b5e20' }]
+    },
+    options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+}
+
+async function loadUrgents() {
+  const res = await apiFetch('/signalements/urgents/');
+  const tbody = document.getElementById('urgents-tbody');
+  if (!res.ok) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-muted">Erreur de chargement.</td></tr>';
+    return;
+  }
+  const data = await res.json();
+  const items = Array.isArray(data) ? data : (data.results || []);
+  if (items.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-muted">Aucun signalement urgent en attente 🎉</td></tr>';
+    return;
+  }
+  tbody.innerHTML = items.map(s => `
+    <tr>
+      <td>#${s.id}</td>
+      <td>${s.quartier_nom}</td>
+      <td>${s.type_dechet_display}</td>
+      <td><span class="badge badge-urgence-${s.niveau_urgence}">${URGENCE_LABELS[s.niveau_urgence]}</span></td>
+      <td><span class="badge badge-statut-${s.statut}">${STATUT_LABELS[s.statut]}</span></td>
+      <td>${new Date(s.created_at).toLocaleDateString('fr-FR')}</td>
+    </tr>
+  `).join('');
+}
+
+loadDashboard();
+loadUrgents();
+</script>
+{% endblock %}

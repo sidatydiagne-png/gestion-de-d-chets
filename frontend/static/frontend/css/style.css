@@ -1,0 +1,88 @@
+:root {
+  --dechets-green: #2e7d32;
+  --dechets-green-dark: #1b5e20;
+  --dechets-amber: #f9a825;
+  --dechets-red: #c62828;
+}
+
+body {
+  background-color: #f4f6f5;
+}
+
+.navbar-dechets {
+  background-color: var(--dechets-green-dark);
+}
+
+.navbar-dechets .nav-link {
+  color: rgba(255,255,255,.85);
+}
+
+.navbar-dechets .nav-link.active,
+.navbar-dechets .nav-link:hover {
+  color: #fff;
+  font-weight: 600;
+}
+
+.brand-icon {
+  font-size: 1.3rem;
+}
+
+.card-stat {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+
+.card-stat .stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.badge-urgence-faible { background-color: #90caf9; }
+.badge-urgence-moyen { background-color: #f9a825; }
+.badge-urgence-urgent { background-color: #ef6c00; }
+.badge-urgence-critique { background-color: var(--dechets-red); }
+
+.badge-statut-nouveau { background-color: #1976d2; }
+.badge-statut-en_cours { background-color: #f9a825; color: #212529; }
+.badge-statut-resolu { background-color: var(--dechets-green); }
+.badge-statut-rejete { background-color: #6c757d; }
+
+.badge-risque-faible { background-color: #90caf9; }
+.badge-risque-moyen { background-color: #f9a825; color: #212529; }
+.badge-risque-eleve { background-color: #ef6c00; }
+.badge-risque-critique { background-color: var(--dechets-red); }
+
+#map, #carte-leaflet {
+  height: 70vh;
+  width: 100%;
+  border-radius: 10px;
+  z-index: 0;
+}
+
+.photo-preview {
+  max-width: 220px;
+  max-height: 220px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.login-card {
+  max-width: 420px;
+  margin: 8vh auto;
+}
+
+.geo-status {
+  font-size: .85rem;
+}
+
+.btn-dechets {
+  background-color: var(--dechets-green);
+  border-color: var(--dechets-green);
+  color: #fff;
+}
+.btn-dechets:hover {
+  background-color: var(--dechets-green-dark);
+  border-color: var(--dechets-green-dark);
+  color: #fff;
+}

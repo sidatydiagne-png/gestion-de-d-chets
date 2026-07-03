@@ -1,0 +1,201 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Nouveau signalement — Déchets Urbains{% endblock %}
+
+{% block content %}
+<h3 class="mb-4">Nouveau signalement</h3>
+<div id="alert-box"></div>
+
+<div class="card card-stat">
+  <div class="card-body">
+    <form id="sig-form">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Commune</label>
+          <select class="form-select" id="commune" required></select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Quartier</label>
+          <select class="form-select" id="quartier" required disabled>
+            <option value="">Choisissez d'abord une commune</option>
+          </select>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Type de déchet</label>
+          <select class="form-select" id="type_dechet" required>
+            <option value="menager">Déchets ménagers</option>
+            <option value="encombrant">Encombrants (meubles, électros)</option>
+            <option value="construction">Gravats / Construction</option>
+            <option value="industriel">Déchets industriels</option>
+            <option value="liquide">Déchets liquides / chimiques</option>
+            <option value="autre">Autre</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Niveau d'urgence</label>
+          <select class="form-select" id="niveau_urgence" required>
+            <option value="faible">Faible</option>
+            <option value="moyen" selected>Moyen</option>
+            <option value="urgent">Urgent</option>
+            <option value="critique">Critique (danger sanitaire)</option>
+          </select>
+        </div>
+
+        <div class="col-12">
+          <label class="form-label">Description détaillée</label>
+          <textarea class="form-control" id="description" rows="3" required
+            placeholder="Décrivez le dépôt sauvage : quantité approximative, nature, depuis quand, etc."></textarea>
+        </div>
+
+        <div class="col-12">
+          <label class="form-label">Description de l'emplacement</label>
+          <input type="text" class="form-control" id="adresse_description"
+            placeholder="Ex : Devant le marché, côté est">
+        </div>
+
+        <div class="col-12">
+          <label class="form-label d-block">Localisation GPS</label>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="getGeolocation()">
+              <i class="bi bi-geo-alt-fill"></i> Utiliser ma position actuelle
+            </button>
+            <span id="geo-status" class="geo-status text-muted">Position non renseignée</span>
+          </div>
+          <div class="row g-2">
+            <div class="col-md-6">
+              <input type="number" step="any" class="form-control form-control-sm" id="latitude" placeholder="Latitude" readonly>
+            </div>
+            <div class="col-md-6">
+              <input type="number" step="any" class="form-control form-control-sm" id="longitude" placeholder="Longitude" readonly>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12">
+          <label class="form-label">Photo du dépôt</label>
+          <input type="file" class="form-control" id="photo" accept="image/*" capture="environment">
+          <img id="photo-preview" class="photo-preview mt-2 d-none">
+        </div>
+      </div>
+
+      <div class="mt-4 d-flex gap-2">
+        <button type="submit" class="btn btn-dechets" id="submit-btn">
+          <i class="bi bi-send-fill"></i> Envoyer le signalement
+        </button>
+        <a href="{% url 'frontend:signalements_list' %}" class="btn btn-outline-secondary">Annuler</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let communesData = [];
+let quartiersData = [];
+
+async function loadCommunes() {
+  communesData = await apiFetchAll('/communes/');
+  const sel = document.getElementById('commune');
+  sel.innerHTML = '<option value="">— Sélectionnez une commune —</option>' +
+    communesData.map(c => `<option value="${c.id}">${c.nom}</option>`).join('');
+}
+
+async function loadQuartiers() {
+  quartiersData = await apiFetchAll('/quartiers/');
+}
+
+document.getElementById('commune').addEventListener('change', (e) => {
+  const communeId = parseInt(e.target.value);
+  const qSel = document.getElementById('quartier');
+  const filtered = quartiersData.filter(q => q.commune === communeId);
+
+  if (!communeId) {
+    qSel.disabled = true;
+    qSel.innerHTML = '<option value="">Choisissez d\'abord une commune</option>';
+    return;
+  }
+  qSel.disabled = false;
+  qSel.innerHTML = filtered.length
+    ? filtered.map(q => `<option value="${q.id}">${q.nom}</option>`).join('')
+    : '<option value="">Aucun quartier pour cette commune</option>';
+});
+
+function getGeolocation() {
+  const status = document.getElementById('geo-status');
+  if (!navigator.geolocation) {
+    status.textContent = "La géolocalisation n'est pas supportée par ce navigateur.";
+    status.className = 'geo-status text-danger';
+    return;
+  }
+  status.textContent = 'Localisation en cours...';
+  status.className = 'geo-status text-muted';
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      document.getElementById('latitude').value = pos.coords.latitude.toFixed(6);
+      document.getElementById('longitude').value = pos.coords.longitude.toFixed(6);
+      status.textContent = `Position capturée (précision ~${Math.round(pos.coords.accuracy)}m)`;
+      status.className = 'geo-status text-success';
+    },
+    (err) => {
+      status.textContent = "Impossible d'obtenir la position : " + err.message;
+      status.className = 'geo-status text-danger';
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+document.getElementById('photo').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  const preview = document.getElementById('photo-preview');
+  if (!file) { preview.classList.add('d-none'); return; }
+  preview.src = URL.createObjectURL(file);
+  preview.classList.remove('d-none');
+});
+
+document.getElementById('sig-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.innerHTML = 'Envoi en cours...';
+
+  const quartierId = document.getElementById('quartier').value;
+  if (!quartierId) {
+    showAlert('alert-box', 'Veuillez sélectionner un quartier.');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-send-fill"></i> Envoyer le signalement';
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('quartier', quartierId);
+  formData.append('type_dechet', document.getElementById('type_dechet').value);
+  formData.append('niveau_urgence', document.getElementById('niveau_urgence').value);
+  formData.append('description', document.getElementById('description').value);
+  formData.append('adresse_description', document.getElementById('adresse_description').value);
+
+  const lat = document.getElementById('latitude').value;
+  const lng = document.getElementById('longitude').value;
+  if (lat) formData.append('latitude', lat);
+  if (lng) formData.append('longitude', lng);
+
+  const photoFile = document.getElementById('photo').files[0];
+  if (photoFile) formData.append('photo', photoFile);
+
+  const res = await apiFetch('/signalements/', { method: 'POST', body: formData }, true);
+
+  if (res.ok) {
+    window.location.href = "{% url 'frontend:signalements_list' %}";
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showAlert('alert-box', 'Erreur lors de la création : ' + JSON.stringify(err));
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-send-fill"></i> Envoyer le signalement';
+  }
+});
+
+loadCommunes();
+loadQuartiers();
+</script>
+{% endblock %}

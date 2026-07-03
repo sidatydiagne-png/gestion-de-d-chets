@@ -1,0 +1,224 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Signalements — Déchets Urbains{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="mb-0">Signalements</h3>
+  <a href="{% url 'frontend:signalement_create' %}" class="btn btn-dechets">
+    <i class="bi bi-plus-circle"></i> Nouveau signalement
+  </a>
+</div>
+<div id="alert-box"></div>
+
+<div class="card card-stat mb-3">
+  <div class="card-body">
+    <div class="row g-2">
+      <div class="col-md-3">
+        <select class="form-select form-select-sm" id="filter-statut">
+          <option value="">Tous les statuts</option>
+          <option value="nouveau">Nouveau</option>
+          <option value="en_cours">En cours</option>
+          <option value="resolu">Résolu</option>
+          <option value="rejete">Rejeté</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <select class="form-select form-select-sm" id="filter-urgence">
+          <option value="">Toutes urgences</option>
+          <option value="faible">Faible</option>
+          <option value="moyen">Moyen</option>
+          <option value="urgent">Urgent</option>
+          <option value="critique">Critique</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <select class="form-select form-select-sm" id="filter-type">
+          <option value="">Tous types</option>
+          <option value="menager">Déchets ménagers</option>
+          <option value="encombrant">Encombrants</option>
+          <option value="construction">Gravats / Construction</option>
+          <option value="industriel">Déchets industriels</option>
+          <option value="liquide">Déchets liquides / chimiques</option>
+          <option value="autre">Autre</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <button class="btn btn-outline-secondary btn-sm w-100" onclick="loadSignalements(1)">
+          <i class="bi bi-funnel"></i> Filtrer
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card card-stat">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table align-middle table-hover">
+        <thead>
+          <tr>
+            <th>#</th><th>Photo</th><th>Quartier</th><th>Type</th><th>Urgence</th><th>Statut</th><th>Créé le</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="sig-tbody">
+          <tr><td colspan="8" class="text-muted">Chargement...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <nav>
+      <ul class="pagination pagination-sm justify-content-center" id="pagination"></ul>
+    </nav>
+  </div>
+</div>
+
+<!-- Modal traitement -->
+<div class="modal fade" id="traiterModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Traiter le signalement #<span id="traiter-id"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Nouveau statut</label>
+          <select class="form-select" id="traiter-statut">
+            <option value="en_cours">En cours de traitement</option>
+            <option value="resolu">Résolu</option>
+            <option value="rejete">Rejeté (faux signalement)</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Commentaire</label>
+          <textarea class="form-control" id="traiter-commentaire" rows="3"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button class="btn btn-dechets" onclick="submitTraitement()">Valider</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal photo (lightbox) -->
+<div class="modal fade" id="photoModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content bg-dark">
+      <div class="modal-header border-0">
+        <h6 class="modal-title text-white" id="photo-modal-title">Photo du signalement</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center">
+        <img id="photo-modal-img" src="" class="img-fluid rounded" style="max-height:75vh;">
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const URGENCE_LABELS = { faible: 'Faible', moyen: 'Moyen', urgent: 'Urgent', critique: 'Critique' };
+const STATUT_LABELS = { nouveau: 'Nouveau', en_cours: 'En cours', resolu: 'Résolu', rejete: 'Rejeté' };
+let currentTraiterId = null;
+
+function buildQuery(page) {
+  const params = new URLSearchParams();
+  const statut = document.getElementById('filter-statut').value;
+  const urgence = document.getElementById('filter-urgence').value;
+  const type = document.getElementById('filter-type').value;
+  if (statut) params.set('statut', statut);
+  if (urgence) params.set('niveau_urgence', urgence);
+  if (type) params.set('type_dechet', type);
+  params.set('page', page);
+  return params.toString();
+}
+
+async function loadSignalements(page = 1) {
+  const tbody = document.getElementById('sig-tbody');
+  tbody.innerHTML = '<tr><td colspan="8" class="text-muted">Chargement...</td></tr>';
+
+  const res = await apiFetch(`/signalements/?${buildQuery(page)}`);
+  if (!res.ok) {
+    tbody.innerHTML = '<tr><td colspan="8" class="text-danger">Erreur de chargement.</td></tr>';
+    return;
+  }
+  const data = await res.json();
+  const items = data.results || data;
+
+  if (items.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="text-muted">Aucun signalement trouvé.</td></tr>';
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+
+  tbody.innerHTML = items.map(s => `
+    <tr>
+      <td>#${s.id}</td>
+      <td>${s.photo ? `<img src="${s.photo}" class="photo-preview" style="max-width:50px;max-height:50px;cursor:pointer;" onclick="openPhoto('${s.photo}', ${s.id})" title="Cliquer pour agrandir">` : '<span class="text-muted">—</span>'}</td>
+      <td>${s.quartier_nom}</td>
+      <td>${s.type_dechet_display}</td>
+      <td><span class="badge badge-urgence-${s.niveau_urgence}">${URGENCE_LABELS[s.niveau_urgence]}</span></td>
+      <td><span class="badge badge-statut-${s.statut}">${STATUT_LABELS[s.statut]}</span></td>
+      <td>${new Date(s.created_at).toLocaleDateString('fr-FR')}</td>
+      <td>
+        ${s.statut !== 'resolu' && s.statut !== 'rejete' ? `
+          <button class="btn btn-sm btn-outline-success" onclick="openTraiter(${s.id})">
+            <i class="bi bi-check2-square"></i> Traiter
+          </button>` : '<span class="text-muted small">Clôturé</span>'}
+      </td>
+    </tr>
+  `).join('');
+
+  renderPagination(data, page);
+}
+
+function renderPagination(data, page) {
+  const pag = document.getElementById('pagination');
+  if (!data.next && !data.previous) { pag.innerHTML = ''; return; }
+  pag.innerHTML = `
+    <li class="page-item ${!data.previous ? 'disabled' : ''}">
+      <a class="page-link" href="#" onclick="loadSignalements(${page - 1});return false;">Précédent</a>
+    </li>
+    <li class="page-item disabled"><span class="page-link">Page ${page}</span></li>
+    <li class="page-item ${!data.next ? 'disabled' : ''}">
+      <a class="page-link" href="#" onclick="loadSignalements(${page + 1});return false;">Suivant</a>
+    </li>
+  `;
+}
+
+function openPhoto(url, id) {
+  document.getElementById('photo-modal-img').src = url;
+  document.getElementById('photo-modal-title').textContent = `Photo — Signalement #${id}`;
+  new bootstrap.Modal(document.getElementById('photoModal')).show();
+}
+
+function openTraiter(id) {
+  currentTraiterId = id;
+  document.getElementById('traiter-id').textContent = id;
+  document.getElementById('traiter-commentaire').value = '';
+  new bootstrap.Modal(document.getElementById('traiterModal')).show();
+}
+
+async function submitTraitement() {
+  const statut = document.getElementById('traiter-statut').value;
+  const commentaire = document.getElementById('traiter-commentaire').value;
+
+  const res = await apiFetch(`/signalements/${currentTraiterId}/traiter/`, {
+    method: 'POST',
+    body: JSON.stringify({ statut, commentaire }),
+  });
+
+  if (res.ok) {
+    bootstrap.Modal.getInstance(document.getElementById('traiterModal')).hide();
+    showAlert('alert-box', `Signalement #${currentTraiterId} mis à jour.`, 'success');
+    loadSignalements(1);
+  } else {
+    showAlert('alert-box', "Erreur lors du traitement du signalement.");
+  }
+}
+
+loadSignalements(1);
+</script>
+{% endblock %}
