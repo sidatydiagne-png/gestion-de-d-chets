@@ -7,6 +7,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from rest_framework.permissions import AllowAny
+from frontend.views import RegisterView
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -35,6 +36,7 @@ urlpatterns = [
     # Auth JWT
     path('api/auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/auth/register/', RegisterView.as_view(), name='register'),
 
     # API métier
     path('api/', include('zones.urls')),
