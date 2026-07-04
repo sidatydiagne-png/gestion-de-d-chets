@@ -1,29 +1,36 @@
+/* ============================================================
+   Déchets Urbains — Design system
+   Palette : forêt (propreté/nature) + sable & argile (Dakar/Sahel)
+   Signature : dégradé forêt→sable→argile, écho du spectre
+   d'urgence utilisé dans toute l'appli (faible → critique).
+   ============================================================ */
+
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
 
 :root {
-  --bg: #F1F1EF;
+  --bg: #EFF4F0;
   --surface: #FFFFFF;
-  --surface-2: #F6F6F4;
-  --ink: #1C1C1A;
-  --ink-soft: #5A584F;
-  --ink-faint: #8C8A80;
+  --surface-2: #F6F9F6;
+  --ink: #12281E;
+  --ink-soft: #4C6156;
+  --ink-faint: #7E9188;
 
-  --forest-900: #171715;
-  --forest-700: #2B2A26;
-  --forest-600: #3A3833;
-  --forest-500: #4A473F;
-  --forest-100: #E6E4DE;
+  --forest-900: #0A2A1C;
+  --forest-700: #12633F;
+  --forest-600: #1B7A4D;
+  --forest-500: #239A5F;
+  --forest-100: #DCEEE2;
 
   --gold: #D9A441;
   --gold-dark: #B8862E;
   --clay: #C1522B;
   --clay-dark: #9E4020;
-  --sky: #5C7A5C;
+  --sky: #2F7CB0;
 
-  --line: #E3E1DA;
-  --shadow-sm: 0 1px 3px rgba(23, 23, 21, .08);
-  --shadow-md: 0 8px 24px rgba(23, 23, 21, .12);
-  --shadow-lg: 0 16px 40px rgba(23, 23, 21, .18);
+  --line: #DCE5DE;
+  --shadow-sm: 0 1px 3px rgba(10, 42, 28, .06);
+  --shadow-md: 0 8px 24px rgba(10, 42, 28, .10);
+  --shadow-lg: 0 16px 40px rgba(10, 42, 28, .16);
 
   --radius: 14px;
   --gradient-signature: linear-gradient(90deg, var(--forest-600) 0%, var(--gold) 55%, var(--clay) 100%);
